@@ -1,0 +1,403 @@
+SD2IEC – Ist ein Controller/Interface, für die Speichergeräte den CBM-IEC-Bus 
+Copyright (c) 2007-2009 Ingo Korb <ingo@akana.de>
+
+Die Teile, die auf den Code von anderen basieren, siehe Anmerkungen in main.c für Details. 
+JiffyDos senden gegründet auf Code durch M.Kiesel 
+Fette LFN Unterstützung und Lose anderen ideas+code durch Jim Brain 
+crc7.c, die durch pycrc erzeugt werden, sehen Anmerkungen in ihm für pycrc Lizenz. 
+Final Cartridge III Fastloader Unterstützung durch Thomas Giesel 
+
+Freie Software unter GPL-Version 2 NUR, sehen Anmerkungen in main.c und KOPIE für Details. 
+
+FIXME: Diese Datei muss noch erweitert werden. Ganz viel. 
+
+Einleitung: 
+=========
+SD2IEC ist Firmware, benutzt in den Hardware-Module wie MMC2IEC, SD2IEC oder uIEC, das ermöglicht dem Commodore IEC Bus, auf Wechseldatenträger zuzugreifen von (MMC, SD, CF) - betrachten Sie an es als 1541 mit einem modernen Speichermedium anstelle von den Disk. Das Projekt wurde inspiriert durch (und nutzt einige Teile des Codes vom) MMC2IEC [1] durch Lars Pontoppidan und lief einmal auf der gleichen Hardware, es wurde zu groß für den ATmega32, das dort verwendet wurde. 
+
+Z.Z. liefert die Firmware gutes DOS und Dateiebene Kompatibilität mit CBM Laufwerke, aber viel Arbeit bleibt. Sofern nicht ausdrücklich vermerkt, das versucht wird die Codes von den 1541 auszuführen, dieses schließt jeden Software Fastloader ein. 
+
+[1] Homepage: http://pontoppidan.info/lars/index.php?proj=mmc2iec 
+
+Beachten Sie bitte: Wann immer diese Datei über " D64-Images" der Text trifft auf alle Dxx Image Types zu, d.h. D64/D71/D81, wenn nicht anders Vermerkt.
+
+Gestützte Befehle: 
+===============
+ - Allgemeine Anmerkungen:
+Jeder Befehl, der nachstehend nicht aufgeführt wird, wird z.Z. nicht unterstützt. 
+
+- Verzeichnisfilter: 
+Um nur Verzeichnisse zu zeigen, können sie das =B (CMD-kompatibel) und das =D benutzen. 
+
+Auf einem echten Commodore-Laufwerk bringt D alles zusammen. 
+
+Um versteckte Datein im Verzeichnis mit einzuschließen, benutzen Sie *=H - auf einer 1541 wird dies nichts tun. SD2IEC markiert versteckte Datein mit einem H nach der Verschlussmarkierung, d.h. "PRG<H" oder "PRG H"
+
+CMD-Art " kurz" und " lang" Verzeichnisauflistungen mit Zeitstempeln gestützt (" $=T"), einschließlich Zeitstempelfilter. Lesen Sie bitte ein CMD Handbuch für die Syntax bis diese Datei aktualisiert ist. 
+
+- Direktoryverzeichnis: Das CMD-Art Direktoryverzeichnis ($=P) gestützt, einschließlich Filter ($=P: S*). Alle Fächer verzeichnet mit Art " FAT" , obgleich dieses könnte ändern Sie zum " NAT" später für Kompatibilität. 
+
+- CD/MD/RD: 
+Unterverzeichniszugang ist zur Syntax kompatibel, die durch die CMD Drive verwendet, obgleich Drives-/Partition vollständig ignoriert. 
+
+Schnelle Syntaxüberblick: 
+CD: _ Wechselt in das Übergeordneten-Direktory (_ ist der linke Pfeil auf dem C64) 
+CD_ dito 
+CD: foo Änderungen in foo 
+CD/foo dito 
+CD//foo ändert in \ foo 
+CD/foo/: Verriegeln ändert in foo \ in Verriegeln 
+CD/foo/Verriegeln dito 
+
+Sie können Joker überall im Pfad benutzen. Zu in ein M2I oder in ein D64 ändern Image, die Image Datei muss danach genannt werden: , sonst erkennt er es nicht. 
+
+MD 
+verwendet eine Syntax, die CD ähnlich ist und erstellt das Verzeichnis nach dem Doppelpunkt (:) im Verhältnis zu jedem möglichem Verzeichnis vor ihm. 
+
+MD/foo/: Verriegeln schafft Verriegeln im foo
+MD//foo/: Verriegeln schafft Verriegeln in \ foo 
+
+RD 
+löscht ein Unterverzeichnis im aktuellen Verzeichnisses. 
+
+
+RD:foo 
+löscht foo
+
+CD
+wird auch benutzt, um zu die Image Dateien wechseln. Es öffnet sich als ob sie ein Direktory wäre, um CD zu benutzen: _ (linker Pfeil auf dem C64) zum veranlassen. Merken Sie sich bitte, dass Image Dateien durch Dateiextension und Dateigröße ermittelt werden und es gibt keine zuverlässige Weise, zu sehen, ob eine Datei eine gültige Image Datei ist. 
+
+- CP, C 
+Dieses ändert das gegenwärtige Partition, sehen " Partitions" unterhalb für der Details. 
+
+- C: 
+Datei- Kopier Befehl, sollte kompatibl zu CMD sein. Die Syntax ist C [Partition] [Pfad]: Zielname= [[Partition] [Pfad]:]Quellname [, [[p] [p]:]Quellname…] 
+
+Sie können diesen Befehl verwenden, mehrfache Datein in ein einzelnes Ziel zu kopieren archivieren Sie, in diesem Fall alle Quell Datein in das Ziel hinzugefügt werden Datei. 
+Die Satzgliederung beginnt für jeden Quelldateinamen wieder, das bedeutet jeder Quellname wird angenommen, um im Verhältnis zu dem aktuellen Verzeichnis zu sein. Sie können Joker in dem Quellnamen verwenden, aber nur der erste verwendet das Dateinzusammenbringen und wird kopiert. Kopieren REL von Datein sollten gehen, ist aber nicht gut geprüft. 
+
+Mischen der REL und nicht-REL Datein in einer Operation wird nicht gestützt. 
+
+
+- D 
+Direkter Sektorzugang, dieser ist eine Befehlsgruppe, die durch sd2iec eingeführt wird. Einige Commodore-Laufwerke benutzen D für Diskkopie zwischen zwei Laufwerke mit der gleichen Größe. Beim Versuch es hier zu verwenden, wird der Befehl mit dem sd2iec mit einer Fehlermeldung Enden.
+
+D hat drei Unterbefehle: 
+
+DI (Info), Dr (gelesen) und DW (schreiben). 
+Jeder der Befehle erfordert einen geöffneten Puffer  (ähnlich zu U1/U2), aber Pfaden der größeren Sektorgröße der Speichergeräte verwendet werden durch sd2iec, muss sie auch einen großeren Puffer von der Größe 2x (512 Bytes) sein oder größer. Die Ausnahme ist der DI-Befehl mit der Seite, die bis 0 eingestellt wird, sein Resultat wird immer auch in einen Standard ein 256-Byte-Puffer. Wenn Sie versuchen, einen der Befehle mit einem Puffer zu verwenden, der zu klein ist wird eine neue Fehlermeldung, " zurückgebracht; 78, BUFFER TO SMALL, 00,00" ab. 
+
+In den folgenden Punkten die Sekundäradresse, die verwendet wurde um den Puffer zu öffnen wird "bufchan" genannt. 
+
+- DI 
+In der BASIC-Darstellung ist das Befehlsformat " DI" +chr$ (bufchan) +chr$ (Device) +chr$ (Seite) 
+
+" device" ist die Zahl der Physikalisch gefragt zu werden Laufwerk, 
+" Seite" die zurückzuholende Informationsseite. Z.Z. nur die eingeführte Seite ist Seite 0, die zurückbringt folgende Datenstruktur: 
+
+1 Byte: Zahl der gültigen Bytes in dieser Struktur Dieses schließt dieses Byte ein und wird bedeutet zur Verfügung zu stellen Rückwärtskompatibilität, wenn diese Struktur ausgedehnt ist zu einer neueren Zeit. Neue Felder werden immer hinzugefügt die alten Programme des Endes so können die Felder noch lesen sie wissen ungefähr. 
+
+1 Byte: Höchste diskinfo Seite gestützt Immer 0 fürs Erste, erhöht sich wenn mehr Informationen Seiten werden addiert (geplant: Schließen Sie ATA IDENTIFIZIERENEN ab Ausgang für IDE und CSD für Sd) 
+
+1 Byte: Platten Dieses Feld identifizierent den Einheitentyp, z.Z. eingeführte Werte sind: 
+	0 IDE 
+	2 SD 
+	3 Dataflash 
+
+1 Byte: Sektorgröße geteilt durch 256 Dieses Feld hält die Sektorgröße des Speichergeräts geteilt durch 256. 
+
+4 Bytes: Zahl der Sektoren auf dem Laufwerk ein kleiner-endian (der gleiche Byteauftrag wie die 6502) Wert von der Zahl Sektoren auf dem Speichergerät. Wenn es überhaupt eine Notwendigkeit gibt, zu erhöhen berichtet Kapazität über 2TB hinaus (für 512 Bytesektoren) dieses Feld bringt 0 zurück und ein 64-bitwert wird addiert zu dieser diskinfo Seite. 
+
+Wenn Sie feststellen möchten, wenn es eine Vorrichtung gibt, die reagiert zu einer gegebenen Zahl lesen Sie Info-Seite 0 für sie. Wenn es Nr. gibt die vorhandene Vorrichtung, die der Zahl Sie entspricht, sieht eine BEREITE Störung des DriveS NICHT auf dem Störungskanal und " Zahl des gültigen bytes" Eintragung in der Struktur ist 0. 
+
+Nehmen Sie nicht an, dass Gerätenummern zwischen Freigaben beständig sind und nehmen Sie nicht an, dass sie irgendein kontinuierlich sind. Zu scannen für alle anwesenden Vorrichtungen sollten Sie 0-7 fürs Erste fragen mindestens, aber diese Begrenzung kann der neueren Freigaben sich erhöhen. 
+
+- DR/DW 
+In der BASIC-Darstellung würde das Befehlsformat sein 
+" DR" +chr$ (bufchan) +chr$ (device) 
++chr$ (Sektor UND 255) 
++chr$ ((sector/256) UND 255) 
++chr$ ((sector/65536) UND 255) 
++chr$ ((sector/16777216) UND 255) 
+(oder " DW" anstelle vom " Dr) 
+
+
+aber dieses wird nicht Arbeit über den C64 weil UND nimmt nicht an Parameter größer als 32767. Die Grundregel sollte klar sein obwohl, die letzten vier Bytes eine Sektorzahl mit 32 Bits innen sind kleiner-endian Byte Auftrag. 
+
+Dr liest den Sektor zum Puffer, DW schreibt den Inhalt vom Puffer zum Sektor. Beide Befehle aktualisieren Störungskanal, wenn eine Störung, für Dr die 20, LESEFEHLER (READ-ERROR) auftritt wurde beschlossen, Lesefehler darzustellen; für schreiben Sie Probleme während DW, das es 25 einstellt, SCHREIB FEHLER (WRITE-ERROR) für Störungen und 26, SCHREIBEN SCHÜTZEN (WRITE-PRTEKT-ERROR) Sie sich AN, wenn die Vorrichtung schreibgeschützt ist. 
+
+- G-P 
+Erhalten Sie Fachinfo, sehen Sie CMD FD/HD Handbuch für Details. Berichtet Informationen werden teilweise gefälscht, Rückgespräch sind willkommen. 
+
+- P 
+Positionierung von doesn' t-gerade Arbeit für REL archiviert aber auch für Regular Datein auf einem FAT-Fach. Wenn Sie für Regular verwendet werden, archiviert das Format ist " P" +chr$ (Kanal) +chr$ (hallo) +chr$ (mittleres) +chr$ (lo) das sucht bis das 0 gründete Offsethi*65536+256*mid+lo in der Datei. 
+
+- N: 
+Format arbeitet, nur wenn ein Image D64 bereits angebracht wird. Dieser Befehl ist begrenzt auf die DiskImage 1541, normalerweise bekannt als. D64. 
+
+- R
+Die Umbenennung der Datein sollte die gleichen sein, wie auf den CMD Laufwerken, obgleich die Störungen, die für unzulässige Karakter im Namen gekennzeichnet werden, können sich unterscheiden. 
+
+- S: 
+Das Namenszusammenbringen wird völlig, Verzeichnisse werden ignoriert gestützt. Das Verkratzen der mehrfachen Datein trennte sich vorbei, wird gestützt auch ohne Begrenzung auf die Zahl Datein außer der maximalen Befehlszeile Länge (normalerweise 100 bis 120 Karakter). 
+
+- T-R und TW 
+Wenn Ihre Hardware die Eigenschaften der RTC Unterstützt, die  Befehle der T-R (Zeit gelesen) und TW (Zeit schreiben), sind vorhanden. Wenn das RTC nicht vorhanden ist , Rückkehr beider Befehle 30, SYNTAX-STÖRUNG, 00.00; wenn das RTC vorhanden aber nicht richtig eingestellt ist, wird T-R Rückkehr 31, SYNTAX-STÖRUNG, 00.00. 
+
+Beide Befehle erwarten eine vier stellige Eingabe, der das Zeitformat spezifiziert das zu verwenden werden wird, erwartet TW, dass die neue Zeit diesem vier stelliges Format innen genau folgt. Das Format ging durch T-R mit der gleichen Zeitformat zurück. 
+
+Die möglichen Formate sind: 
+
+- " A" SCII: " SONNE. 01/20/08 01:23: 45 PM" +CHR$(13) 
+Die Tag von Woche String kann irgendein Tag " sein; SUN." , " MON." , " TUES" , " WED." , " THUR" , " FRI." , " SAT.". 
+Das Jahrfeld ist Zweistellig 100. 
+
+- " B" CD oder " D" ecimal: 
+Diese beiden Formate verwenden 9 Bytes, um die Zeit zu spezifizieren. Für BCD wird alles BCD-verschlüsselt, denn Dezimalstrich die Zahlen werden gesendet,/analysierte unbesehene. 
+
+Byte 0: Tag der Woche (0 für Sonntag) 
+1: Jahr (Modulo 100 für BCD; -1900 für Dezimalstrich, 
+	108 d.h. für 2008) 
+2: Monat (1-Stellig) 
+3: Tag (1-Stellig) 
+4: Stunde (1-12) 
+5: Minute (0-59) 
+6: An zweiter Stelle (0-59) 
+7: AM/PM-Flag (0 ist morgens, alles anderes ist P.M.) 
+8: CHR$(13) 
+
+Wenn die Zeit ein Jahr weniger als eingestellt wird, wird 80 als 20xx gedeutet. 
+
+- U0 
+Einheitenadresse, die mit " ändert; U0> " +chr$ (neue Adresse) wird gestützt, andere Befehle U0 werden z.Z. nicht eingeführt. 
+
+- U1/U2/B-R/B-W 
+Blockmesswert und -schreiben wird völlig gestützt, während ein Image D64 angebracht wird. 
+
+- B-P 
+Gestützt, nicht gegen das ursprüngliche ROM überhaupt überprüft. 
+
+- UI+/UI- 
+Das etwas schnellere Busprotokoll für das VC20 auf und Pfad von Arbeiten schalten, es hat zwar viel geprüft. 
+
+- UI/UJ 
+Weiches/hartes Zurückstellen - UI stellt gerade das " ein; 73,… " Mitteilung auf dem Störungskanal, UJ schließt alle aktiven Puffer aber wird stellen das aktuelle Verzeichnis zurück, angebrachtes Image, Tauschenliste oder noch etwas. 
+
+- U <Shift-J> 
+Reales hartes Zurückstellen - dieser Befehl verursacht einen Wiederanlauf des AVR-Prozessors (das Urladeprogramm überspringend, wenn Sie angebracht werden). ist Zeichenkode 202. 
+
+- X: 
+Ausgedehnte Befehle. Wenn Sie JiffyDOS verwenden, können Sie sie senden, indem Sie verwenden. 
+@" … " X; - ohne Anführungsstriche Du wirst empfangen eine Störung. 
+
+- XEnum Stellt das " ein; Dateiextension mode". Kontrollen dieser Einstellung wenn Datein auf FAT werden mit einer Überschrift x00 und einer Verlängerung oder nicht geschrieben. Mögliche Werte für numerisches sind: 
+
+0: Schreiben Sie Datein nie des Formats x00. 
+1: Schreiben Sie Datein des Formats x00 für SEQ/USR/REL, 
+	aber nicht für PRG 
+2: Schreiben Sie Datein immer des Formats x00. 
+3: Verwenden Sie SEQ/USR/REL Dateiextensionen, 
+	keine Überschrift x00 
+4: Selben wie 3, aber auch für PRG 
+
+Wenn Sie Modus 3 oder 4 einstellen, wird das Verlängerungsverstecken automatisch ermöglicht. Diese Einstellung kann im EEPROM unter Verwendung XW gespeichert werden, die Rückstellung Wert ist 1. 
+
+Für Kompatibilität mit vorhandenen Programmen, die Datein D64 schreiben, PRG Datein, die D64, D41, D71, D81 oder M2I als Verlängerung haben wird immer ohne eine Überschrift x00 und außen geschrieben irgendeine zusätzliche PRG Dateiextension. 
+
+- XE+/XE- 
+aktivieren das Verlängerungsverstecken. Wenn Sie, Datein in FAT mit ermöglicht werden eine PRG/SEQ/USR/REL Verlängerung hat ihre entfernte Verlängerung und die Dateinart geändert zur Art spezifiziert durch die Datei Verlängerung - z.B. APPLICATION.PRG wird eine genannte PRG Datei " APPLICATION" , " README.SEQ" wird eine FOLGENDE Datei, die " genannt wird; README". Diese Markierungsfahne kann im EEPROM unter Verwendung XW gespeichert werden, die Rückstellung Wert ist untauglich (-). 
+
+- XB+/XB- 
+aktivieren Berechnung des freien Blockes für Laufwerke FAT32. Wie die Berechnung des freien Blockes für FAT32 viel Zeit nehmen kann sie kann unter Verwendung XB- untauglich sein. Wenn sie untauglich ist, wird sd2iec berichten Sie immer über " 1 BLÖCKE FREE" für Laufwerke FAT32. Der freie Block Berechnung auf FAT12/FAT16 ist nicht beeinflußt, weil es gerade nimmt zwei Sekunden höchstens. Diese Markierungsfahne kann im EEPROM unter Verwendung gespeichert werden XW, der Default-Wert wird ermöglicht (+). 
+
+- XJ+/XJ- 
+eingestellt oder zurückgestellt der JiffyDOS Protokollstützmarkierungsfahne. Diese Markierungsfahne kann sein gespeichert im EEPROM unter Verwendung XW, wird der Default-Wert ermöglicht (+). 
+
+- X*+/X*- 
+aktivieren Art 1581 * zusammenpassend. Wenn Sie, Karakter ermöglicht werden nachdem wird a * an das Ende des Dateinamens angepasst. Wenn sie gesperrt werden, werden alle mögliche Karakter nachdem a * ignoriert. Diese Markierungsfahne kann im EEPROM unter Verwendung XW gespeichert werden, der Default-Wert wird ermöglicht (+). 
+
+- XCnum 
+Stellen Sie Oszillatorkalibrierungswert auf numerisches ein (muss zwischen sein 0 und 255). Zu Rückstellung ist, was auch immer Ihr Span führt. Dieses Wert kann im EEPROM unter Verwendung XW gespart werden. 
+
+- XDdrv=val 
+bauen Laufwerke zusammen. Auf ATA-gegründeten Maßeinheiten oder Maßeinheiten mit Mehrfachverbindungsstelle Laufwerksarten, dieser Befehl können benutzt werden, um zu ermöglichen oder neu zuordnen die Laufwerke. drv ist der 
+Mitnehmerschlitz (0-7), wenn val, ist einer von: 
+0: ATA Vorlagenvorrichtung 
+1: ATA Sklavenvorrichtung 
+4: Primär-SD/MMC Vorrichtung 
+5: Sekundär-SD/MMC Vorrichtung 
+6: Dataflash Vorrichtung 
+15: keine Laufwerke 
+
+Merken Sie dass die nur Vorrichtungen, die durch die spezifische Hardware gestützt werden kann vorgewählt werden. Ungestützte Einheitentypen bringen zurück Störung, wenn Sie verlangt werden. Auch merken Sie, dass Sie eine Vorrichtung nicht vorwählen können in den mehrfachen Mitnehmerschlitzen. Schließlich während es zu möglich ist ordnen Sie ATA Vorrichtungen unter Verwendung dieser Funktionalität, es ist stark neu entmutigt. Benutzen Sie die Master/Slaveüberbrücker auf den ATA Vorrichtungen stattdessen. Um die Driveskonfiguration zurückzustellen, stellen Sie alle Mitnehmerschlitze ein zum " kein device". Dieser Wert kann in dauerhaft gespart werden EEPROM unter Verwendung XW. 
+
+XD? 
+Sehen Sie die gegenwärtige Driveskonfiguration an. Beispielresultat: " 03, D: 00=04: 01=00: 02=01,10,01". Die Schiene zeigt an gegenwärtige Einheitenadresse, während der Sektor ausgedehntes anzeigt fahren Sie Konfigurations Status angaben. 
+
+- X X 
+ohne irgendwelche folgenden Karakter berichtet über die gegenwärtige Lage von allen ausgedehnten Parametern über den Störungskanal, ähnlich zu DolphinDOS. Beispielresultat: " 03, J: C152: E01+: B+: *+, 08,00" Die Schiene zeigt die gegenwärtige Einheitenadresse an. 
+
+- XS: 
+Namenseinstellung eine Tauschenliste - sehen Sie " Ändernde Disk Images" unten. XS Ordner tausch liste 
+
+- XW 
+Speichern Sie Konfiguration zu EEPROM Dieses befiehlt Speicher die gegenwärtige Konfiguration im EEPROM. Es wird automatisch, wenn der AVR zurückgestellt wird, so gelesen alle mögliche Änderungen, die Sie vornahmen, bestehen weiter, sogar nach abstellen die Hardware. 
+
+Die gespeicherte Konfiguration umfaßt die Oszillatorkalibrierung Wert, die JiffyDOS Protokoll support flag, der Verlängerungsmodus und die gegenwärtige Einheitenadresse. Wenn Sie die Vorrichtung geändert haben Adresse durch Software, sd2iec Will schalten energie oben mit dieser Adresse es sei denn Sie haben die Adressbrücke (wenn vorhanden) zu geändert eine andere Einstellung als der ein Active zu der Zeit Konfiguration wurde gespeichert. Sie können an diese Eigenschaft wie denken Ändern der Bedeutung von einer spezifischen Einstellung der Brücker zu einer anderen Adresse, wenn dieses genug zu Ihnen logisch klingt. 
+
+Das " Hardware hebt Software aufhebt hardware" auf; Priorität wurde beschlossen auf sd2iec zurückgreifen zu dürfen, selbst wenn es soft- ist zusammengebaut für eine Gerätenummer, die bereits vorbei genommen wird eine andere Vorrichtung auf dem Bus, ohne zu müssen, die zu entfernen Vorrichtung, zum von sd2iec zu rekonfigurieren (z.B. wenn Wechselstrom 128D verwendet wird). 
+
+- X? 
+Ausgedehnte Versionsfrage Dieses beherrscht Rückkehr die ausgedehnte Versionsschnur, die besteht aus der Version, der Prozessorart Satz zur Bauzeit und das Suffix der Konfigurations Datei (entspricht normalerweise zum kurzen Namen der Hardware wurde sd2iec für kompiliert). 
+
+- M-R, M-W, ICH 
+Speicher wert bringt gelegentliche Daten der geforderten Länge zurück. Gedächtnisschreiben kennt in der Adresse aus, die für das Ändern der Einheitenadresse auf 1541 verwendet wird und ändert die Adresse von sd2iec zum geforderten Wert. Er wird auch überprüfen Sie, ob das Transmitted Data (TD) irgendwelchen der bekannten Software entspricht fastloaders also der korrekte Emulationscode können verwendet werden, wenn ICH angerufen werde. 
+
+- E-R, E-W 
+Beide Befehle arbeiten wie HERR und M-W, aber anstelle vom Messwert-/Schreiben RAM sie erlauben Zugang zu einem Benutzerbereich des EEPROM. Einflüsse dieses Bereichs z.Z. 512 Bytes und Zugänge über seinem Ende hinaus ergeben eine  SYNTAX ERROR 32. Es wird stark empfohlen, um an einem Protokoll für das Teilen dieses Bereichs zu arbeiten zwischen mehrfachen Anwendungen, die ihre Konfiguration innen speichern möchten es aber das gibt über dem Bereich dieses Projektes hinaus. 
+
+
+Während der Inhalt des EEPROM zum RAM kopiert werden muss, bevor sie können seien zum Computer gesendet Sie, den es nicht möglich ist, mehr Daten mit a zu lesen einziger Befehl als der Fehlermeldungpuffer (Rückstellungsgröße: 36 Bytes) kann halten. Similiarly, schreibend wird durch die Größe des Befehls eingeschränkt Puffer (mindestens 42 Bytes für Kompatibilität, erwartet, um mindestens zu sein 100 Bytes in den Freigabeversionen). 
+
+Der Benutzerbereich behindert nicht die gespeicherte Konfiguration (XW) innen irgendeine Weise. 
+
+Große Puffer: 
+===========
+Zu Befehle stützen, die direkt auf die Speichergerätunterstützung zurückgreifen für größere Puffer wurde hinzugefügt. Ein großer Puffer kann vorbei zugeteilt werden eine Datei öffnen genannt worden " ##<d>" (genau characters" drei; mit ersetzt durch eine einzelne Stelle, welche die Zahl 256 Bytepuffern spezifiziert, um zu sein angekettet in einen großen Puffer - z.B. " ##2" für einen 512-Byte-Puffer " ##4" für 1024 Bytes etc. Anders als einen Standardpuffer, in dem der Lese-Schreibzeiger auf Byte 1 eingestellt wird, beginnt ein großer Puffer mit dem r/w Zeiger Zeigen auf Byte 0, weil das scheint, zum Autor vernünftiger zu sein. 
+
+Wenn dort aren' t genügende freien Puffer, zum der Größe zu stützen forderten Sie 70, wird KEINE KANAL-Mitteilung in den Störungskanal eingestellt und keine Datei ist geöffnet. Wenn der Dateiname ist nicht genau drei Bytes lang ein Standard Puffer (" #") wird anstatt für Kompatibilität zugeteilt. 
+
+Der BP-Befehl stützt einen dritten Parameter, der das hohe Byte hält von der Pufferposition z.B. " BP 9 4 1" Positionen zu Byte 260 (1*256+4) des Puffers auf Sekundäradresse 9. 
+
+Kein Befehl wird diesmal eingeführt, das große Puffer benutzt. 
+
+Lange Datein-Namen: 
+================== 
+Lange Dateinnamen (nennt d.h. nicht innerhalb der 8.3 Begrenzungen), werden an gestützt FAT, aber für Kompatibilität folgert die 8.3, die, Name wenn das lange verwendet wird Name übersteigt 16 Karakter. Wenn Sie alles außer ASCII-Karakter benutzen auf dem PC oder ihren PETSCII Äquivalenten auf dem Commodore können Sie erhalten Sie merkwürdige Karakter auf dem anderen System weil der LFN Gebrauch unicode Karakter auf Disk, aber sd2iec analysiert nur das niedrige Byte von jedem Karakter im Namen. 
+
+Fach: 
+=====
+sd2iec kennzeichnet eine Multifach Unterstützung, die der der CMD Laufwerke ähnlich ist. Die Fächer (die auf unterschiedlichen Driveen für einige Hardwarekonfigurationen sein können), erreicht unter Verwendung der Laufwerknummer der Befehle, die vom Computer gesendet und nummeriert Beginnen mit 1. Fach 0 ist ein spezieller Fall: Weil die meiste Software doesn' t-Stützlaufwerknummern oder sendet immer Laufwerknummer 0, Punkte dieses Faches zum z.Z. vorgewählten Fach. Durch Rückstellung zurückgreifen die Zugänge, zum 0 zu verteilen auf Fach 1, dieses können durch das Senden von " geändert werden werden; CP" über dem Befehlskanal mit Sein ein ASCII nummerieren Sie von 1 bis. " 255; C
+
+Software fastloaders: 
+==================
+Turbodisk 
+-------------- 
+Turbodisk ermittelt durch die zyklische Blockprüfung seines 493-Byte-langen schlaffen Codes und ICH Adresse 0x0303. Der gleiche Code scheint, unter verschiedenen Namen verwendet zu werden, unter ihnen " Turbodisk" (2.1 und 2.2) und " Schnell-Load". Leider die TIMING-Anforderungen sind extrem fest und können nicht getroffen werden interner RC Oszillator des AVR, selbst wenn kalibriert. Sie benötigen wirklich externes 8MHz, das Kristall sind oder Datenlesen durch das C64 sind Kauderwelsch. Es bekannt nicht, wenn es eine NTSC-kompatible Version dieses fastloader gibt. 
+
+Final Cartridge III 
+------------------------------------- 
+gestützt die schnelle Ladevorrichtung und der schnelle Retter abschließender Patrone III. Die schnelle Ladevorrichtung scheint, ohne einen Kristall zu arbeiten, der schnelle Retter war nicht geprüft. Es bekannt nicht, wenn es eine NTSC-kompatible Version unter Verwendung gibt selben fahren Code, aber mindestens für das fastloader scheint das ROM FC3 enthalten Sie zwei verschiedene C64-side Implementierungen. Das etwas unterschiedliche fastloader, das für Datein benutzt, freezed mit dem FC3 gestützt auch. 
+
+EXOS V3 und das Tier-System 
+---------------------------- 
+Beide, die, die Ladevorrichtung benutzt durch diese kernals gestützt, ist sehr ähnlich die FC3 fasten Ladevorrichtung. 
+
+Action Replay 6 
+--------------- 
+Das AR6 liest ein Byte vom Drivesrom, um zu überprüfen, welches fastloader es sollte Gebrauch. sd2iec zurückbringt einen Wert sd2iec, der die Patrone zwingen sollte, um zu verwenden die Standardkernal Ladevorrichtung anstelle von seinem (noch ungestützten) fastloader. 
+
+Dreamload 
+--------- 
+Dreamload Gebrauch verweist Spur-/Sektorzugang, also wird er nur gestützt auf D64 oder ähnlichen DiskImageformaten. Wie sd2iec Befehle warten muss vom C64 ständig können die Diskänderungsknöpfe unempfänglich werden, mehrfache Zeiten des Versuchs, wenn Sie brauchen. Dreamload ist ein " captive" fastloader, sd2iec Aufenthalt im Dreamload Modus, bis er ein " empfängt; verlassen Sie loader" Befehl vom C64. Um sd2iec zu zwingen um Normalbetrieb wieder aufzunehmen, halten Sie die Disk ändern Sie Knopf bis die rote LED einschält (gerade wie Schlafmodus). 
+
+Merken Sie bitte, dass Dreamload nicht mit mehr als einer Vorrichtung auf arbeitet der Serienbus Pfaden der Weise benutzt es die ATN Linie. 
+
+JiffyDOS: 
+========= 
+Das JiffyDOS Protokoll hat die sehr entspannten TIMING-Begrenzungen, die mit verglichen werden Turbodisk, aber noch nicht so entspanntes wie das StandardCommodore Iec-Protokoll. Augenblick scheint, etwas mis-abgestimmte RC Oszillatoren, aber Sie zuzulassen noch sollte erwarten es, um ohne Oszillatorkalibrierung zu arbeiten. Wenn Frequenzversatz ist Sie erhält falsche Daten zu groß, die normalerweise da eine GEFUNDENE Störung der Datei NICHT verkündet, weil der Name der empfangene Drive bereits war verstümmelt. 
+
+Datein x00: 
+========== 
+Datein P00/S00/U00/R00 werden durchsichtig gestützt, dieses Mittel, die sie sich zeigen herauf in die Verzeichnisauflistung mit ihrem internen Dateinamen anstelle von FAT-Dateiname. Sie umbenennen nur Änderungen der interne Name. Das XE Befehl definiert, wenn Verlängerungen x00 verwendet werden, wenn man Datein, vorbei schreibt Rückstellung sd2iec benutzt sie für SEQ/USR/REL Datein aber nicht für PRG. Die Satzgliederung der Datein x00 wird immer ermöglicht, selbst wenn, sie zu schreiben nicht ist. 
+
+Datein x00 werden erkannt, indem man beide die Verlängerung der Datei überprüft (P/S/U/R mit einem zweistelligen Suffix) und die Überschriftunterzeichnung. 
+
+Disk-Image: 
+============ 
+DiskImage werden durch ihre Dateiextension erkannt (. D64. D41. D71. D81) und ihre 
+Dateigröße (sein muss eins von 174848, von 175531, von 349696, von 351062, von 819200). Wenn das Image hat, fügte ein Störungsinfo-Block es wird verwendet, um Lesefehler zu simulieren an. Das Schreiben zu einem Sektor mit einer Störung arbeitet immer, aber es wird nicht frei die angezeigte Störung. Image D81 mit Störungsinfo-Blöcken werden nicht gestützt. 
+
+M2I Datein: 
+========== 
+M2I Datein werden völlig gestützt. sd2iec stützt die FOLGENDE und USR Datein in diesem Format zusätzlich zusätzlich PRG und zu DEL, die bereits in MMC2IEC eingeführt wurden. Aus Kompatibilitätsgründen wird die Dateinart nicht wenn ÖffnungsDatein überprüft. Innerhalb einer M2I Datei werden die Datein immer als Blöcke 0 (DEL) oder 1 gezeigt, weil das Benennen von Notfall für jede Datei die Verzeichnisauflistung zu viel verlangsamte. Für Kompatibilität mit bestehenden M2I Datein benutzen die Dateien Überschriften nicht P00, selbst wenn die Dateinart FOLGEND oder USR ist. 
+
+REL Datein: 
+========== 
+Teilweise REL Dateinunterstützung wird eingeführt. Sie sollte für vorhandene Datein adaequat sein, aber das Herstellen der neuen Datein und/oder das Hinzufügen der Aufzeichnungen vorhandenen Datein können ausfallen. REL Datein in den DiskImagen werden noch, nicht nur als Datein auf einem FAT-Mittel gestützt. Wenn Unterstützung x00 gesperrt wird, wird das erste Byte einer REL Datei angenommen, um die Satzlänge zu sein. 
+
+Ändernde Disk-Image
+==================== 
+Weil einige Programme ist mehr als erfordern, eine Disk, die dort seitlich ist, Unterstützung für das Ändern des z.Z. angebrachten Diskimage mit einem Knopf, der an den Diskänderungsstift angeschlossen wird. 
+
+Wenn Ihr Stromkreis keinen haben einen Diskänderungsstift/-knopf, die Sie in der Lage sein konnten, ihn zu addieren sich: 
+
+- Für das ursprüngliche MMC2IEC und das NKC MMC2IEC: Schließen Sie einen Knopf von PA4 zu Boden an. PA4 ist Stift 6 von der VERDÜNNTEN Version vom Steuerpult oder vom Stift 33 auf Oberfläche-bringen Sie Version an. 
+
+- Für Shadowolf' s MMC2IEC 1.x PCBs: Schließen Sie einen Knopf von PC4 zu Boden an. PC4 ist Stift 23 von der VERDÜNNTEN Version vom Steuerpult oder vom Stift 23 auf Oberfläche-bringen Sie Version an. 
+
+- Irgendein anderer Stromkreis ohne Diskänderungsstift von einem bequemen Verbindungsstück irgendwo und kein Knopf eingeweiht dieser Funktion: Überprüfen Sie bitte mit dem Lieferanten des Brettes und des gelesenen config.h in den Quellen zu herausfinden, wie man sie anschließt. 
+
+Um diese Funktionalität zu verwenden, stellen Sie eine Textdatei her die die Datei verzeichnet Namen aller DiskImage, die Sie zwischen austauschen möchten, einer pro Linie. Die Dateinnamen werden genauso wie der CD Befehl, so Sie analysiert kann einen Pfad zum Image mit einschließen, wenn Sie gewünscht werden. 
+
+Beispiele: 
+=== Beispiel 1 === 
+FOO.D64 
+BAR (Verriegeln).D64 
+BAZ.D64 
+=== Ende von Beispiel 1 === 
+
+=== Beispiel 2 === 
+//NEATGAME/: DISK1A.D64 
+//NEATGAME/: DISK1B.D64 
+//NEATGAME/: DISK2A.D64 
+//NEATGAME/: DISK2B.D64 
+=== Ende von Beispiel 2 === 
+
+Die Tauschenliste wird ermöglicht, indem man " sendet; XS: Dateiname" über dem Befehlskanal mit Dateinamen der Name der Imageliste verursachte sein Sie, analysiert genauso wie irgendein anderer Dateiname. 
+
+Nachdem dem Schicken XS des ersten Image in der Liste, ist automatisch angebracht. Um zum folgenden Image in der Liste zu schalten, betätigen Sie den Knopf. Wenn dem neuen Image wurde erfolgreich beide LED blinkt zweimal angebracht. Wenn du das letzte erreichte Image in der Liste, die den Knopf betätigt, anbringt das erste Image wieder. Das ganzes dieses ist mit vollständig kompatibel normale Imagemontage/das Unmounting, also Sie können unmount das DiskImage immer wenn Sie den Einfassungszyklus später wünschen und wieder.aufnehmen, indem Sie drücken Knopf. 
+
+Pfaden der Weise wird dieser Eigenschaft Sie werden begrenzt nicht auf ein eingeführt tauschen Sie die Liste aus, die gerade D64 Image, M2I und sogar FAT-Verzeichnisse enthält arbeitet auch. FIXME: Tut diese ruhige Arbeit? 
+
+AUTOSWAP.LST
+Mehrseitige Disk-Images packt man idealerweise in en eigenes Verzeichnis auf der SD-Karte und editiert am PC eine Textdatei "autoswap.lst" dau, in der die Disk'seiten' in der richtigen Reihenfolge eingetragen werden [disk1.d64, disk2.d64 usw... disk ist gegen den Namen der d64 auszutauschen], der Diskchanger arbeitet die Liste nur ab.
+Wenn Sie den Knopf bedrängen, wenn keine Liste vor eingestellt worden ist, oder wenn vorhergehende Liste wurde durch das Senden von XS gelöscht, welches die Software nach a sucht archivieren Sie benanntes AUTOSWAP.LST im gegenwärtigen Verzeichnis (FAT) und verwenden Sie dieses während die gegenwärtige Tauschenliste, bis Sie sie oder manuell entaktivieren, ändern das Verzeichnis (andernfalls würde ein AUTOSWAP.LST im neuen Verzeichnis sein ignoriert, bis Sie XS senden, das nette " tötend; es gerade works" Glauben). 
+
+FIXME: Integrieren Sie das folgende in das Vorausgehen 
+Der Änderungsknopf der zweiten Disk ist eingeschaltet 
+
+- PA5 für LarsP/NKC 
+- PC3 für Shadowolf' s MMC2IEC 1.x 
+- PC2 für Shadowolf' s sd2iec 1.x (" Reserve" auf der Überschrift) - PG4 für uIEC 
+
+Irgendein jener Knöpfe löst den Gebrauch AUTOSWAP.LST aus. Wenn eine Tauschenliste bereits aktiv ist, schält der erste Knopf zum folgenden Image in der Liste, schält der zweite Knopf zum vorhergehenden Image in der Liste und im Betätigen beider Knöpfe zusammen schält zum ersten Image in der Liste. 
+
+Das Bestätigungsblinzeln ist red+green, das vorbei gefolgt wird Grün für " next" , durch Rot für " previous" und vorbei red+green für " first". 
+
+Schlaf-Modus: 
+=========== 
+Wenn Sie den Diskänderungsknopf für zwei Sekunden gedrückt halten, wird sd2iec auf den "Schlaf-modus" geschaltet. In diesem Modus hört es den Bus nicht, bis Sie den Diskänderungsknopf für zwei Sekunden wieder drücken welches den Normalbetrieb wieder aufnimmt. Der Schlafmodus erlaubt Ihnen zu halten sd2iec schloß an den Serienbus an, selbst wenn Sie etwas laden von einem anderen Drive, der eine schnelle Ladevorrichtung benutzt, die tut nicht Arbeit mit mehr als einem Gerät auf dem Bus. 
+
+Während Schlafmodus aktiv ist, ist die rote LED eingeschaltet und die grüne LED ist ausgeschaltet. 
+
+Andere wichtige Anmerkungen: 
+====================== 
+- Wenn Sie den (Vorwärts) Knopf der Diskänderung während der Energie niederhalten auf der Software verwendet Default-Werte anstelle von gespeicherten denen im EEPROM. 
+
+- Datei überschreiben (@foo) wird eingeführt, indem sie zuerst die Datei löscht. 
+
+- Dateigrößen im Verzeichnis sind in den Blöcken (von 254 Bytes), aber die Blöcke geben 
+Mitteilung berichtet wirklich über freie Blöcke frei. Sie ist ein Kompromiß der Kompatibilitäts-, Genauigkeits- und Codegröße. 
+
+- Wenn Sie, das niedrige Byte der folgenden Linie Verbindungszeiger des Verzeichnisses gewusst werden Auflistung wird bis (Dateisize Umb. 254), +2 eingestellt, also können Sie berechnen zutreffende Größe der Datei wenn erforderlich. Die 2 wird addiert, also kann sie nie sein verwechselt für eine Endenmarkierung (0) oder für den Default-Wert (1, vorbei verwendet an wenig die Laufwerke 1541 und 1571). 
+
+- Wenn Ihre Hardware mehr als eine Sd-Karte stützt und ändert irgendein eine stellt das gegenwärtige Fach bis 1 und das aktuelle Verzeichnis von zurück alle Fächer zum Wurzel-Drive. Handeln dies gerade für die Karte das wurde würde verursachen Lose Probleme wenn die Zahl Fächern geändert auf den vorhergehenden und eben eingesetzten Karten seien Sie unterschiedlich. 
+
+Kompilationsanmerkungen: 
+================== 
+sd2iec erfordert avr-libc Version 1.6.x. 
+
+sd2iec wird gegründet, in den mehrfachen Konfigurationen kompiliert zu werden, vorbei gesteuert worden KonfigurationsDatein. Durch Rückstellung sucht der MakeDatei nach einer genannten Datei ' config' , aber Sie können es, indem Sie den Namen auf, aufheben angeben Imageen Befehlszeile mit " Imageen Sie CONFIG=Dateiname". Wenn Sie *BSD benutzen, können Sie den MakeDatei redigieren müssen, um eine andere awk Implementierung zu verwenden anstelle vom Tölpel - leider erfordert WinAVR Kompatibilität unter Verwendung des Tölpels innen dort. 
+
+Ein BeispielkonfigurationsDatei genanntes " Config-example" wird mit dem Quellencode, sowie die verkürzten Datein versehen, die entsprechen geben Sie Zweiheiten frei. Wenn Sie sd2iec für eine kundenspezifische Hardware kompilieren möchten Sie können config.h auch redigieren müssen, um die Portdefinitionen zu ändern. 

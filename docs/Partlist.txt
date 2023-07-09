@@ -1,0 +1,47 @@
+Partlist
+
+Exported from SD2IEC TicTac.brd at 29.01.2019 12:04
+
+EAGLE Version 7.7.0 Copyright (c) 1988-2016 CadSoft
+
+Assembly variant: 
+
+Part     Value             Package            Library        Position (mil)        Orientation
+
+C1       100n              C0805K             rcl            (1100.59055 667.48031) R270
+C2       10µ               C_TANTAL_A         0_rr           (632.59843 255)       R180
+C3       10µ               C_TANTAL_A         0_rr           (635.70866 132.51969) R180
+C4       56p               C0805K             rcl            (1399.25197 698.11024) R90
+C5       56p               C0805K             rcl            (1397.79528 850.55118) R270
+C6       10µ               C_TANTAL_A         0_rr           (1507.95276 544.09449) R270
+C7       100n              C0805K             rcl            (400 730)             R90
+C8       100n              C0805K             rcl            (725 375)             R180
+D1       4148              SOD-123            0_rr           (401.41732 299.37008) R180
+IC1      MEGA644P          TQFP44             0_rr           (743.89764 709.37008) R180
+IC2      MCP1700T-3002E_TT SOT95P237X112-3N   SamacSys_Parts (410 150)             R90
+LED1     red               LED1206            0_rr           (919.96063 156.10236) R180
+LED2     green             LED1206            0_rr           (1204.40945 153.89764) R180
+Q1       8,0 MHz           HC49/S             0_rr           (1245.66929 790)      R270
+R2       10k               R0805              rcl            (544.05512 465.03937) MR180
+R3       10k               R0805              rcl            (540.90551 247.44094) MR180
+R4       10k               R0805              rcl            (547.16535 634.29134) MR180
+R7       18                R0805              rcl            (545.31496 545.66929) MR180
+R8       22k               R0805              rcl            (664.48819 503.34646) MR90
+R9       18                R0805              rcl            (545.94488 334.33071) MR180
+R10      22k               R0805              rcl            (666.85039 292.20472) MR90
+R11      18                R0805              rcl            (549.13386 718.74016) MR180
+R12      22k               R0805              rcl            (660.70866 674.84252) MR90
+R13      nB                R0805              rcl            (745.70866 655.74803) MR90
+R20      2,2R              R0805              rcl            (1403.11024 519.29134) R90
+R30      330               R0805              rcl            (896.61417 266.81102) R180
+R31      330               R0805              rcl            (1181.49606 258.70079) R180
+R101     10k               R0805              rcl            (1181.37795 356.29921) R0
+S1                         TASTER-9314_SMD    Ergaenzung     (354.33071 1181.10236) R0
+S2                         TASTER-9314_SMD    Ergaenzung     (866.14173 1181.10236) R0
+S3                         TASTER-9314_SMD    Ergaenzung     (1377.95276 1181.10236) R0
+T2       IRLML2402         SOT23_C            0_rr           (411.85039 499.68504) MR180
+T3       IRLML2402         SOT23_C            0_rr           (410.03937 291.5748)  MR180
+T4       IRLML2402         SOT23_C            0_rr           (415.07874 674.68504) MR180
+X1                         MICROMATCH-6       0_rr           (186.49606 332.59843) R90
+X2       MICROSD           MICRO_SD_CONNECTOR my_microsd     (2204.72441 236.22047) R90
+X4                         1X6_ISP            0_rr           (1487.48031 396.92913) R270
