@@ -2,7 +2,7 @@
 
 
 
-![SD2IEC Tic Tac](./pics/SD2IEC Tic Tac.jpg)
+![SD2IEC_Tic_Tac](./pics/SD2IEC_Tic_Tac.png)
 
 ![schematic](./pics/schematic.png)
 
