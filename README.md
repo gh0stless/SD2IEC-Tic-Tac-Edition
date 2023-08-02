@@ -2,10 +2,10 @@
 
 
 
-![SD2IEC Tic Tac](F:\GitHub\SD2IEC-Tic-Tac-Edition\pics\SD2IEC Tic Tac.jpg)
+![SD2IEC Tic Tac](./pics/SD2IEC Tic Tac.jpg)
 
-![schematic](F:\GitHub\SD2IEC-Tic-Tac-Edition\pics\schematic.png)
+![schematic](./pics/schematic.png)
 
-![board](F:\GitHub\SD2IEC-Tic-Tac-Edition\pics\board.png)
+![board](./pics/board.png)
 
-![connector](F:\GitHub\SD2IEC-Tic-Tac-Edition\pics\connector.png)
+![connector](./pics/connector.png)
