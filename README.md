@@ -9,3 +9,5 @@
 ![board](./pics/board.png)
 
 ![connector](./pics/connector.png)
+
+![ISP-connector](./pics/ISP-connector.png)
