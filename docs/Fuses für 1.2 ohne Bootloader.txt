@@ -1,3 +1,0 @@
-LOW EF
-High 91
-Ext. FD
